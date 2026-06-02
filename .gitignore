@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 環境変数・シークレット（コミットしないこと）
+.env
+*.pem
+*.key
+credentials.json
+
+# エディタ
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Snowflake connections（認証情報を含む場合があるため除外）
+# ~/.snowflake/connections.toml は含めない

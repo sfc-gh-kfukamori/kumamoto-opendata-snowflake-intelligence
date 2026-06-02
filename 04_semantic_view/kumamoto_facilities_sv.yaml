@@ -1,0 +1,347 @@
+# =============================================================================
+# kumamoto_facilities_sv.yaml
+# 熊本市 施設系セマンティックビュー - Cortex Analyst 定義ファイル
+#
+# 対象: 指定緊急避難場所・公共施設・子育て施設・公衆Wi-Fiアクセスポイント
+# 使用テーブル:
+#   - KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V（施設統合ビュー）
+#   - KUMAMOTO_OPENDATA_DB.RAW_DATA.WIFI_ACCESS_POINTS（WiFiスポット）
+# =============================================================================
+
+name: kumamoto_facilities_sv
+description: >
+  熊本市のオープンデータを基にした施設情報のセマンティックビューです。
+  指定緊急避難場所・公共施設・子育て施設・公衆Wi-Fiアクセスポイントを
+  統合しており、災害種別対応や子育てサービス有無での絞り込みが可能です。
+  熊本市職員の方々が自然言語で施設情報を検索・分析するために設計されています。
+
+tables:
+  # =========================================================================
+  # メインテーブル: 施設統合ビュー
+  # =========================================================================
+  - name: facilities
+    description: >
+      指定緊急避難場所・公共施設・子育て施設を統合した施設一覧。
+      施設種別・災害対応フラグ・子育てサービス等の属性を含む。
+    base_table: KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+
+    dimensions:
+      - name: 施設種別大分類
+        synonyms:
+          - 施設タイプ
+          - 施設分類
+          - 種別
+          - facility type
+        description: >
+          施設の大分類。
+          「指定緊急避難場所」「公共施設」「子育て施設」の3種類。
+        expr: 施設種別大分類
+        data_type: TEXT
+        unique: false
+        sample_values:
+          - 指定緊急避難場所
+          - 公共施設
+          - 子育て施設
+
+      - name: 施設種別小分類
+        synonyms:
+          - 施設詳細種別
+          - 細分類
+          - sub type
+        description: >
+          施設の詳細種別。
+          例: 地域子育て支援拠点・児童厚生施設・保育所・病児保育事業所 等
+        expr: 施設種別小分類
+        data_type: TEXT
+
+      - name: 施設名称
+        synonyms:
+          - 施設名
+          - 名称
+          - facility name
+        description: 施設の正式名称
+        expr: 施設名称
+        data_type: TEXT
+        unique: false
+
+      - name: 所在地
+        synonyms:
+          - 住所
+          - address
+          - 場所
+        description: 施設の所在地（都道府県〜番地の連結表記）
+        expr: 所在地
+        data_type: TEXT
+
+      - name: 区名
+        synonyms:
+          - 区
+          - 行政区
+          - ward
+        description: >
+          熊本市の行政区名。
+          中央区・東区・西区・南区・北区・および旧町村地区。
+        expr: 区名
+        data_type: TEXT
+        sample_values:
+          - 中央区
+          - 東区
+          - 西区
+          - 南区
+          - 北区
+
+      - name: 緯度
+        description: 施設の緯度（WGS84 座標系）
+        expr: 緯度
+        data_type: NUMBER
+
+      - name: 経度
+        description: 施設の経度（WGS84 座標系）
+        expr: 経度
+        data_type: NUMBER
+
+      # --- 避難場所の災害種別フラグ ---
+      - name: 地震対応フラグ
+        synonyms:
+          - 地震避難
+          - 地震対応
+          - 地震
+        description: 地震に対応した指定緊急避難場所かどうか（TRUE = 対応）
+        expr: 地震対応フラグ
+        data_type: BOOLEAN
+
+      - name: 洪水対応フラグ
+        synonyms:
+          - 洪水避難
+          - 洪水対応
+          - 洪水
+        description: 洪水に対応した指定緊急避難場所かどうか
+        expr: 洪水対応フラグ
+        data_type: BOOLEAN
+
+      - name: 津波対応フラグ
+        synonyms:
+          - 津波避難
+          - 津波対応
+          - 津波
+        description: 津波に対応した指定緊急避難場所かどうか
+        expr: 津波対応フラグ
+        data_type: BOOLEAN
+
+      - name: 崖崩れ対応フラグ
+        synonyms:
+          - 崖崩れ
+          - 土石流
+          - 地滑り
+        description: 崖崩れ・土石流・地滑りに対応した指定緊急避難場所かどうか
+        expr: 崖崩れ対応フラグ
+        data_type: BOOLEAN
+
+      - name: 高潮対応フラグ
+        synonyms:
+          - 高潮
+          - 高潮避難
+        description: 高潮に対応した指定緊急避難場所かどうか
+        expr: 高潮対応フラグ
+        data_type: BOOLEAN
+
+      # --- 子育て施設のサービスフラグ ---
+      - name: 一時預かり可否
+        synonyms:
+          - 一時預かり
+          - 一時保育
+          - 時間預かり
+        description: 子育て施設で一時預かりサービスが利用可能かどうか
+        expr: 一時預かり可否
+        data_type: BOOLEAN
+
+      - name: 病児保育あり
+        synonyms:
+          - 病児保育
+          - 病気の子ども
+          - 病中保育
+        description: 病児保育を実施している子育て施設かどうか
+        expr: 病児保育あり
+        data_type: BOOLEAN
+
+      - name: 電話番号
+        description: 施設の電話番号
+        expr: 電話番号
+        data_type: TEXT
+
+    measures:
+      - name: 施設件数
+        synonyms:
+          - 施設数
+          - 件数
+          - 箇所数
+          - count
+          - number of facilities
+        description: 指定した条件に合致する施設の件数
+        expr: COUNT(*)
+        data_type: NUMBER
+        default_aggregation: count
+
+      - name: 合計収容人数
+        synonyms:
+          - 収容人数
+          - 避難収容人数
+          - 定員合計
+        description: 避難場所の想定収容人数の合計（避難場所のみ有効）
+        expr: SUM(収容定員)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 平均収容人数
+        description: 避難場所の想定収容人数の平均
+        expr: AVG(収容定員)
+        data_type: NUMBER
+        default_aggregation: avg
+
+      - name: 対応災害種別数合計
+        description: 各避難場所が対応している災害種別の合計数
+        expr: SUM(対応災害種別数)
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # =========================================================================
+  # サブテーブル: WiFi アクセスポイント
+  # =========================================================================
+  - name: wifi
+    description: >
+      熊本市内の公衆無線LANアクセスポイント（くまもとフリーWi-Fi）の設置場所一覧。
+    base_table: KUMAMOTO_OPENDATA_DB.RAW_DATA.WIFI_ACCESS_POINTS
+
+    dimensions:
+      - name: 名称
+        synonyms:
+          - Wi-Fi設置場所
+          - アクセスポイント名
+        description: Wi-Fi アクセスポイントの設置場所名称
+        expr: 名称
+        data_type: TEXT
+
+      - name: 所在地_連結標記
+        synonyms:
+          - Wi-Fi所在地
+          - 設置場所住所
+        description: Wi-Fi アクセスポイントの所在地
+        expr: 所在地_連結標記
+        data_type: TEXT
+
+      - name: 緯度
+        description: Wi-Fi スポットの緯度
+        expr: 緯度
+        data_type: NUMBER
+
+      - name: 経度
+        description: Wi-Fi スポットの経度
+        expr: 経度
+        data_type: NUMBER
+
+      - name: 備考
+        synonyms:
+          - Wi-Fiサービス名
+          - WIFIサービス
+        description: Wi-Fi サービス名（例: くまもとフリーWi-Fi）
+        expr: 備考
+        data_type: TEXT
+
+    measures:
+      - name: WiFi設置件数
+        synonyms:
+          - Wi-Fi件数
+          - Wi-Fiスポット数
+          - 公衆Wi-Fi数
+        description: 公衆Wi-Fi アクセスポイントの設置件数
+        expr: COUNT(*)
+        data_type: NUMBER
+        default_aggregation: count
+
+# =============================================================================
+# カスタムインストラクション（Cortex Analyst への追加指示）
+# =============================================================================
+custom_instructions: |
+  このセマンティックビューは熊本市のオープンデータに基づく施設情報です。
+  以下の点に留意して回答してください:
+
+  1. 災害種別フラグ（地震対応フラグ等）は TRUE/FALSE のブール値です。
+     「地震に対応している」= 地震対応フラグ = TRUE です。
+
+  2. 区名の抽出は不完全な場合があります。「中央区」「東区」「西区」「南区」「北区」
+     の5区が主要な行政区です。
+
+  3. 収容定員は避難場所のみに設定されています。公共施設・子育て施設は NULL です。
+
+  4. 位置情報（緯度・経度）が NULL の施設は地図上に表示できません。
+     集計クエリでは NULL を除外して問題ありません。
+
+  5. データの調査時点: 令和6年（2024年）公開データです。
+
+# =============================================================================
+# サンプル質問（Snowflake Intelligence のデモ用）
+# =============================================================================
+verified_queries:
+  - name: 地震対応避難場所件数
+    question: 地震に対応している避難場所は何か所ありますか？
+    sql: |
+      SELECT COUNT(*) AS 件数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+      WHERE  施設種別大分類 = '指定緊急避難場所'
+        AND  地震対応フラグ = TRUE
+    verified: true
+
+  - name: 区別避難場所数
+    question: 区ごとの指定緊急避難場所の数と合計収容人数を教えてください
+    sql: |
+      SELECT
+        区名,
+        COUNT(*)         AS 避難場所数,
+        SUM(収容定員)    AS 合計収容人数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+      WHERE  施設種別大分類 = '指定緊急避難場所'
+      GROUP BY 区名
+      ORDER BY 避難場所数 DESC
+    verified: true
+
+  - name: 一時預かり可能施設
+    question: 一時預かりができる子育て施設を教えてください
+    sql: |
+      SELECT
+        施設名称,
+        施設種別小分類,
+        所在地,
+        電話番号
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+      WHERE  施設種別大分類 = '子育て施設'
+        AND  一時預かり可否 = TRUE
+      ORDER BY 施設名称
+    verified: true
+
+  - name: 収容人数上位避難場所
+    question: 収容人数が最も多い避難場所のトップ10を教えてください
+    sql: |
+      SELECT
+        施設名称,
+        所在地,
+        収容定員,
+        対応災害種別数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+      WHERE  施設種別大分類 = '指定緊急避難場所'
+        AND  収容定員 IS NOT NULL
+      ORDER BY 収容定員 DESC
+      LIMIT  10
+    verified: true
+
+  - name: 病児保育施設
+    question: 病児保育を実施している施設はどこですか？
+    sql: |
+      SELECT
+        施設名称,
+        施設種別小分類,
+        所在地,
+        電話番号
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.FACILITIES_COMBINED_V
+      WHERE  病児保育あり = TRUE
+      ORDER BY 施設名称
+    verified: true

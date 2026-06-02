@@ -1,0 +1,586 @@
+# =============================================================================
+# kumamoto_demographics_sv.yaml
+# 熊本市 人口統計セマンティックビュー - Cortex Analyst 定義ファイル
+#
+# 対象: 地域・年齢別人口（令和6年1月1日時点）
+# 使用テーブル:
+#   - KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_LONG_V（縦持ち人口データ）
+#   - KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V（地域サマリー）
+#   - KUMAMOTO_OPENDATA_DB.ANALYTICS.BICYCLE_PARKING_SUMMARY_V（駐輪場）
+#   - KUMAMOTO_OPENDATA_DB.ANALYTICS.ROAD_LIGHTS_STATUS_V（道路照明灯）
+# =============================================================================
+
+name: kumamoto_demographics_sv
+description: >
+  熊本市の地域・年齢別人口統計（令和6年1月1日時点）のセマンティックビューです。
+  校区単位の人口データを年齢区分（5歳刻み）・性別に分解して提供します。
+  高齢化率・年少化率・生産年齢人口比率などの分析指標を含みます。
+  また、駐輪場・道路照明灯などのインフラ情報も含んでいます。
+
+tables:
+  # =========================================================================
+  # テーブル 1: 人口縦持ち（年齢区分・性別ごとの詳細）
+  # =========================================================================
+  - name: demo_long
+    description: >
+      校区・年齢区分・性別ごとの人口を縦持ち形式で格納したビュー。
+      年齢区分は 0〜4歳 から 85歳以上まで5歳刻みの17区分。
+      高齢者（65歳以上）・年少者（0〜14歳）・生産年齢（15〜64歳）の
+      フラグ列を含むため、特定年齢層での絞り込みが容易。
+    base_table: KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_LONG_V
+
+    dimensions:
+      - name: 地域名
+        synonyms:
+          - 校区
+          - 地区名
+          - 地域
+          - area
+          - 校区名
+        description: 熊本市の校区名（例: 中央区城東校区、東区戸島校区）
+        expr: 地域名
+        data_type: TEXT
+        unique: false
+        sample_values:
+          - 中央区城東校区
+          - 中央区慶徳校区
+          - 東区戸島校区
+
+      - name: 区名
+        synonyms:
+          - 区
+          - 行政区
+          - ward
+        description: >
+          熊本市の行政区名。地域名（校区名）の先頭から抽出。
+          中央区・東区・西区・南区・北区の5区。
+        expr: 区名
+        data_type: TEXT
+        sample_values:
+          - 中央区
+          - 東区
+          - 西区
+          - 南区
+          - 北区
+
+      - name: 調査年月日
+        synonyms:
+          - 調査日
+          - 基準日
+          - 調査時点
+        description: 人口データの調査基準日（令和6年1月1日 = 2024-01-01）
+        expr: 調査年月日
+        data_type: DATE
+
+      - name: 年齢区分
+        synonyms:
+          - 年齢
+          - 年代
+          - 年齢グループ
+          - age group
+          - 世代
+        description: >
+          5歳刻みの年齢区分。
+          0〜4歳、5〜9歳、10〜14歳、15〜19歳、20〜24歳、
+          25〜29歳、30〜34歳、35〜39歳、40〜44歳、45〜49歳、
+          50〜54歳、55〜59歳、60〜64歳、65〜69歳、70〜74歳、
+          75〜79歳、80〜84歳、85歳以上 の17区分。
+        expr: 年齢区分
+        data_type: TEXT
+        sample_values:
+          - 0〜4歳
+          - 5〜9歳
+          - 65〜69歳
+          - 70〜74歳
+          - 85歳以上
+
+      - name: 性別
+        synonyms:
+          - gender
+          - 男女
+        description: 性別（男性 / 女性）
+        expr: 性別
+        data_type: TEXT
+        sample_values:
+          - 男性
+          - 女性
+
+      - name: 高齢者区分
+        synonyms:
+          - 高齢者
+          - 65歳以上
+          - elderly
+          - 老齢
+          - 老人
+        description: 65歳以上かどうか（TRUE = 高齢者）
+        expr: 高齢者区分
+        data_type: BOOLEAN
+
+      - name: 年少者区分
+        synonyms:
+          - 子ども
+          - 年少
+          - 14歳以下
+          - 0〜14歳
+          - children
+          - 子供
+        description: 0〜14歳（年少人口）かどうか
+        expr: 年少者区分
+        data_type: BOOLEAN
+
+      - name: 生産年齢区分
+        synonyms:
+          - 生産年齢
+          - 労働人口
+          - 15〜64歳
+          - working age
+          - 働き盛り
+        description: 15〜64歳（生産年齢人口）かどうか
+        expr: 生産年齢区分
+        data_type: BOOLEAN
+
+    measures:
+      - name: 人口合計
+        synonyms:
+          - 人口
+          - 総人口
+          - 人数
+          - population
+          - 住民数
+        description: 指定した条件（年齢区分・性別・地域等）の人口合計
+        expr: SUM(人口)
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # =========================================================================
+  # テーブル 2: 地域サマリー（高齢化率等の計算済み指標）
+  # =========================================================================
+  - name: demo_summary
+    description: >
+      校区ごとに総人口・年齢3区分別人口・高齢化率・年少化率を
+      あらかじめ計算したサマリービュー。
+      「○○区の高齢化率は？」「どの校区が最も高齢化が進んでいるか？」
+      などの質問に素早く答えるために使用する。
+    base_table: KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V
+
+    dimensions:
+      - name: 地域名
+        synonyms:
+          - 校区
+          - 地区名
+          - 地域
+        description: 校区名
+        expr: 地域名
+        data_type: TEXT
+
+      - name: 区名
+        synonyms:
+          - 区
+          - 行政区
+        description: 行政区名（中央区・東区・西区・南区・北区）
+        expr: 区名
+        data_type: TEXT
+        sample_values:
+          - 中央区
+          - 東区
+          - 西区
+          - 南区
+          - 北区
+
+      - name: 調査年月日
+        description: 調査基準日（2024-01-01）
+        expr: 調査年月日
+        data_type: DATE
+
+    measures:
+      - name: 総人口
+        synonyms:
+          - 人口
+          - 住民数
+          - 総人口合計
+        description: 校区の総人口
+        expr: SUM(総人口)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 高齢者人口
+        synonyms:
+          - 高齢者数
+          - 65歳以上人口
+          - 老齢人口
+        description: 65歳以上の人口合計
+        expr: SUM(高齢者人口)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 年少人口
+        synonyms:
+          - 子ども人口
+          - 0〜14歳人口
+          - 子供の数
+        description: 0〜14歳（年少人口）の合計
+        expr: SUM(年少人口)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 生産年齢人口
+        synonyms:
+          - 労働人口
+          - 15〜64歳人口
+          - 働き盛り人口
+        description: 15〜64歳（生産年齢人口）の合計
+        expr: SUM(生産年齢人口)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 高齢化率
+        synonyms:
+          - 高齢化
+          - 高齢者比率
+          - 高齢化の程度
+        description: 高齢化率（65歳以上 / 総人口 × 100）。単位: ％
+        expr: AVG(高齢化率)
+        data_type: NUMBER
+        default_aggregation: avg
+
+      - name: 年少化率
+        synonyms:
+          - 年少化
+          - 子ども比率
+          - 年少者比率
+        description: 年少化率（0〜14歳 / 総人口 × 100）。単位: ％
+        expr: AVG(年少化率)
+        data_type: NUMBER
+        default_aggregation: avg
+
+      - name: 世帯数
+        synonyms:
+          - 世帯
+          - 家庭数
+          - households
+        description: 世帯数の合計
+        expr: SUM(世帯数)
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # =========================================================================
+  # テーブル 3: 道路照明灯
+  # =========================================================================
+  - name: road_lights
+    description: >
+      熊本市内の道路照明灯（街路灯・公園灯）の管理状態・光源種別ビュー。
+      LED化状況・要対応フラグ・設置年月日等を含む。
+    base_table: KUMAMOTO_OPENDATA_DB.ANALYTICS.ROAD_LIGHTS_STATUS_V
+
+    dimensions:
+      - name: 管理者
+        synonyms:
+          - 管理区
+          - 担当区
+        description: 道路照明灯の管理者（区名: 東区・中央区等）
+        expr: 管理者
+        data_type: TEXT
+        sample_values:
+          - 東区
+          - 中央区
+          - 西区
+          - 南区
+          - 北区
+
+      - name: 街路灯区分
+        synonyms:
+          - 灯種別
+          - 照明種類
+        description: 街路灯 or 公園灯の区分
+        expr: 街路灯区分
+        data_type: TEXT
+        sample_values:
+          - 街路灯
+          - 公園灯
+
+      - name: 照明種別
+        synonyms:
+          - 照明のタイプ
+          - 照明の用途
+        description: 照明の用途種別（交差点・局所・連続・橋梁）
+        expr: 照明種別
+        data_type: TEXT
+        sample_values:
+          - 交差点
+          - 局所
+          - 連続
+          - 橋梁
+
+      - name: 光源
+        synonyms:
+          - 電球の種類
+          - 光源種別
+          - LED
+          - 水銀灯
+        description: 光源の種類（LED灯・水銀灯等）
+        expr: 光源
+        data_type: TEXT
+
+      - name: LED化状態
+        synonyms:
+          - LED化
+          - LED交換状況
+          - 省エネ化
+        description: LED化済み / 水銀灯（LED未換）/ その他 の区分
+        expr: LED化状態
+        data_type: TEXT
+        sample_values:
+          - LED化済み
+          - 水銀灯（LED未換）
+          - その他
+
+      - name: 柱状態_結論
+        synonyms:
+          - 支柱の状態
+          - 点検結果
+          - 柱の状況
+        description: 支柱の総合判定（良・要検討等）
+        expr: 柱状態_結論
+        data_type: TEXT
+        sample_values:
+          - 良
+          - 要検討
+
+      - name: 要対応フラグ
+        synonyms:
+          - 要対応
+          - 対応が必要
+          - 要修繕
+        description: 柱状態が「要検討」等の対応が必要な照明灯かどうか
+        expr: 要対応フラグ
+        data_type: BOOLEAN
+
+    measures:
+      - name: 照明灯件数
+        synonyms:
+          - 照明灯の数
+          - 街路灯数
+          - 道路照明灯数
+          - 本数
+        description: 道路照明灯の件数
+        expr: COUNT(*)
+        data_type: NUMBER
+        default_aggregation: count
+
+  # =========================================================================
+  # テーブル 4: 駐輪場
+  # =========================================================================
+  - name: bicycle
+    description: >
+      熊本市内の駐輪場の台数・料金区分等を整形したビュー。
+      自転車・原付・二輪の駐輪台数、有料無料区分、屋根の有無を含む。
+    base_table: KUMAMOTO_OPENDATA_DB.ANALYTICS.BICYCLE_PARKING_SUMMARY_V
+
+    dimensions:
+      - name: 施設名称
+        synonyms:
+          - 駐輪場名
+          - 名称
+        description: 駐輪場の名称
+        expr: 施設名称
+        data_type: TEXT
+
+      - name: 有料無料区分
+        synonyms:
+          - 料金
+          - 有料
+          - 無料
+          - 駐輪料金
+        description: 有料・無料の区分
+        expr: 有料無料区分
+        data_type: TEXT
+        sample_values:
+          - 有料
+          - 無料
+
+      - name: 屋根の有無
+        synonyms:
+          - 屋根
+          - 屋根付き
+          - 雨よけ
+          - 屋根あり
+        description: 屋根の有無（有/無/一部有）
+        expr: 屋根の有無
+        data_type: TEXT
+        sample_values:
+          - 有
+          - 無
+          - 一部有
+
+    measures:
+      - name: 自転車台数合計
+        synonyms:
+          - 自転車駐輪台数
+          - 自転車スペース
+        description: 自転車の駐輪可能台数の合計
+        expr: SUM(自転車台数)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 合計駐輪台数
+        synonyms:
+          - 駐輪台数
+          - 駐輪スペース
+          - 駐輪可能台数
+        description: 自転車・原付・二輪の合計駐輪可能台数
+        expr: SUM(合計駐輪台数)
+        data_type: NUMBER
+        default_aggregation: sum
+
+      - name: 駐輪場件数
+        synonyms:
+          - 駐輪場数
+          - 駐輪場の数
+        description: 駐輪場の件数
+        expr: COUNT(*)
+        data_type: NUMBER
+        default_aggregation: count
+
+# =============================================================================
+# テーブル間のリレーションシップ
+# =============================================================================
+relationships:
+  - name: demo_long_to_summary
+    left_table: demo_long
+    right_table: demo_summary
+    join_type: many_to_one
+    relationship_columns:
+      - left_column: 地域名
+        right_column: 地域名
+
+# =============================================================================
+# カスタムインストラクション
+# =============================================================================
+custom_instructions: |
+  このセマンティックビューは熊本市の人口統計データです。
+  以下の点に留意して回答してください:
+
+  1. 人口データの基準日は令和6年（2024年）1月1日です。
+
+  2. 「高齢者」= 65歳以上、「年少者」= 0〜14歳、「生産年齢」= 15〜64歳 です。
+
+  3. 高齢化率は「65歳以上の人口 ÷ 総人口 × 100（%）」です。
+
+  4. 年齢区分の集計には demo_long テーブルを使い、
+     地域サマリー（高齢化率等）には demo_summary テーブルを使ってください。
+
+  5. 「区ごと」の集計は 区名 カラムでグループ化してください。
+
+  6. 道路照明灯の LED 化率 = LED化済み本数 ÷ 全照明灯本数 × 100 です。
+     水銀灯（LED未換）が残っている数を問われた場合は
+     LED化状態 = '水銀灯（LED未換）' でフィルタしてください。
+
+  7. 要対応の照明灯を問われた場合は 要対応フラグ = TRUE でフィルタしてください。
+
+# =============================================================================
+# サンプル質問（Snowflake Intelligence のデモ用）
+# =============================================================================
+verified_queries:
+  - name: 高齢者人口最多校区
+    question: 65歳以上の高齢者が最も多い校区はどこですか？
+    sql: |
+      SELECT
+        地域名,
+        高齢者人口,
+        高齢化率,
+        総人口
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V
+      ORDER BY 高齢者人口 DESC
+      LIMIT  10
+    verified: true
+
+  - name: 高齢化率ランキング
+    question: 高齢化率が最も高い校区のランキングを教えてください
+    sql: |
+      SELECT
+        地域名,
+        区名,
+        高齢化率,
+        高齢者人口,
+        総人口
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V
+      WHERE  総人口 > 0
+      ORDER BY 高齢化率 DESC
+      LIMIT  20
+    verified: true
+
+  - name: 区ごと総人口
+    question: 熊本市の区ごとの総人口と高齢化率を教えてください
+    sql: |
+      SELECT
+        区名,
+        SUM(総人口)    AS 総人口,
+        SUM(高齢者人口) AS 高齢者人口,
+        SUM(年少人口)   AS 年少人口,
+        ROUND(SUM(高齢者人口) * 100.0 / NULLIF(SUM(総人口), 0), 1) AS 高齢化率
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V
+      GROUP BY 区名
+      ORDER BY 総人口 DESC
+    verified: true
+
+  - name: 中央区の年齢別人口
+    question: 中央区の年齢別人口の分布を男女別に教えてください
+    sql: |
+      SELECT
+        年齢区分,
+        SUM(CASE WHEN 性別 = '男性' THEN 人口 ELSE 0 END) AS 男性,
+        SUM(CASE WHEN 性別 = '女性' THEN 人口 ELSE 0 END) AS 女性,
+        SUM(人口) AS 合計
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_LONG_V
+      WHERE  区名 = '中央区'
+      GROUP BY 年齢区分
+      ORDER BY MIN(年齢区分)
+    verified: true
+
+  - name: 子ども人口最多校区
+    question: 子ども（0〜14歳）の人口が最も多い校区はどこですか？
+    sql: |
+      SELECT
+        地域名,
+        区名,
+        年少人口,
+        総人口,
+        年少化率
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.DEMOGRAPHICS_SUMMARY_V
+      ORDER BY 年少人口 DESC
+      LIMIT  10
+    verified: true
+
+  - name: 水銀灯残存本数
+    question: 水銀灯（LED未交換）の道路照明灯は何本残っていますか？
+    sql: |
+      SELECT
+        管理者 AS 管理区,
+        COUNT(*) AS 水銀灯本数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.ROAD_LIGHTS_STATUS_V
+      WHERE  LED化状態 = '水銀灯（LED未換）'
+      GROUP BY 管理者
+      ORDER BY 水銀灯本数 DESC
+    verified: true
+
+  - name: 要対応照明灯数
+    question: 要検討状態の道路照明灯は何本ありますか？区ごとに教えてください
+    sql: |
+      SELECT
+        管理者 AS 管理区,
+        COUNT(*) AS 要対応本数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.ROAD_LIGHTS_STATUS_V
+      WHERE  要対応フラグ = TRUE
+      GROUP BY 管理者
+      ORDER BY 要対応本数 DESC
+    verified: true
+
+  - name: 無料駐輪場台数
+    question: 無料で使える駐輪場の合計台数と件数を教えてください
+    sql: |
+      SELECT
+        SUM(合計駐輪台数) AS 合計駐輪台数,
+        COUNT(*)         AS 駐輪場件数
+      FROM   KUMAMOTO_OPENDATA_DB.ANALYTICS.BICYCLE_PARKING_SUMMARY_V
+      WHERE  有料無料区分 = '無料'
+    verified: true
