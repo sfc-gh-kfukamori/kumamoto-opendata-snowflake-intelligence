@@ -11,7 +11,7 @@
 
 ## 推奨するデータモデルの考え方
 - 基本は、複数テーブルを無理に 1 本の横長テーブルにせず、素直な star schema に近い形で logical table と relationship を明示するのが第一選択です。
-- fact と dimension が素直な many-to-one でつながるなら、Semantic View 内で relationship を定義する設計が適しています。Cortex Analyst は relationship が明示されていないと join しません。
+- fact と dimension が素直な many-to-one でつながるなら、Semantic View 内で relationship を定義する設計が適しています。
 - 一方で、1つの業務概念を表現するのに複数テーブルの条件合成が必要な場合は、前段のデータマートや中間 view で business logic を整理してから Semantic View に載せる方が安定します。
 
 ## Dimension / Metric / Filter の設計
